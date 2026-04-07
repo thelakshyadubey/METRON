@@ -1,0 +1,146 @@
+# ============================================================================
+# Python
+# ============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ============================================================================
+# Virtual Environments
+# ============================================================================
+.venv/
+venv/
+ENV/
+env/
+.env/
+
+# ============================================================================
+# Environment Variables & Secrets
+# ============================================================================
+.env
+.env.*
+*.key
+secrets.json
+api_keys.txt
+
+# ============================================================================
+# IDE & Editor Files
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================================
+# OS Files
+# ============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============================================================================
+# Testing & Coverage
+# ============================================================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ============================================================================
+# Jupyter Notebook
+# ============================================================================
+.ipynb_checkpoints
+*.ipynb
+
+# ============================================================================
+# Logs & Temporary Files
+# ============================================================================
+*.log
+logs/
+*.tmp
+temp/
+tmp/
+
+# ============================================================================
+# Project-Specific
+# ============================================================================
+# Exported test results
+exports/
+results/
+*.json.export
+*.csv.export
+
+# Session state (if you want to keep this in git, remove these lines)
+session_state/
+.streamlit/
+
+# Generated diagrams
+*.png.generated
+*.svg.generated
+
+# Performance test data
+performance_data/
+load_test_results/
+
+# RAG ground truth documents (uncomment if you don't want to commit these)
+# ground_truth_docs/
+# *.pdf
+# *.docx
+
+# Cached LLM responses (if implementing caching)
+.llm_cache/
+cache/
+
+# ============================================================================
+# Cloned/Downloaded Repos (scenario-main)
+# ============================================================================
+scenario-main/
+
+# ============================================================================
+# Database Files
+# ============================================================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================================================
+# Documentation Build
+# ============================================================================
+docs/_build/
+site/

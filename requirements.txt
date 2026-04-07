@@ -1,0 +1,21 @@
+# AI Agent Tester - 100% Custom Implementation
+# No external scenario library needed!
+
+# Core
+streamlit>=1.30.0
+aiohttp
+litellm
+python-dotenv
+
+# LLM Providers
+groq
+google-generativeai
+
+# RAG Testing
+PyPDF2  # PDF text extraction
+
+# Testing & Utilities
+flask
+pandas
+pytest
+
