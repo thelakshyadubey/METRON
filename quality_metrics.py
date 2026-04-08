@@ -22,36 +22,17 @@ import json
 import re
 import asyncio
 import os
+import importlib.util
 
-# Try importing RAGAS
-try:
-    from ragas import evaluate as ragas_evaluate
-    from ragas.metrics import (
-        faithfulness,
-        answer_relevancy,
-        context_precision,
-        context_recall,
-    )
-    from ragas import EvaluationDataset, SingleTurnSample
-    HAS_RAGAS = True
-except ImportError:
-    HAS_RAGAS = False
+# Check availability without importing (avoids slow startup)
+def _check_package(name: str) -> bool:
+    try:
+        return importlib.util.find_spec(name) is not None
+    except Exception:
+        return False
 
-# Try importing DeepEval
-try:
-    from deepeval import evaluate as deepeval_evaluate
-    from deepeval.metrics import (
-        AnswerRelevancyMetric,
-        FaithfulnessMetric,
-        HallucinationMetric,
-        ToxicityMetric,
-        BiasMetric,
-        GEval,
-    )
-    from deepeval.test_case import LLMTestCase
-    HAS_DEEPEVAL = True
-except ImportError:
-    HAS_DEEPEVAL = False
+HAS_RAGAS = _check_package("ragas")
+HAS_DEEPEVAL = _check_package("deepeval")
 
 
 # ============================================================================
@@ -166,6 +147,16 @@ async def run_ragas_evaluation(
     results = []
     
     try:
+        # Lazy import to avoid slow startup
+        from ragas import evaluate as ragas_evaluate
+        from ragas.metrics import (
+            faithfulness,
+            answer_relevancy,
+            context_precision,
+            context_recall,
+        )
+        from ragas import EvaluationDataset, SingleTurnSample
+        
         # Create sample for evaluation
         sample = SingleTurnSample(
             user_input=question,
@@ -241,6 +232,17 @@ async def run_deepeval_evaluation(
     results = []
     
     try:
+        # Lazy import to avoid slow startup
+        from deepeval import evaluate as deepeval_evaluate
+        from deepeval.metrics import (
+            AnswerRelevancyMetric,
+            FaithfulnessMetric,
+            HallucinationMetric,
+            ToxicityMetric,
+            BiasMetric,
+        )
+        from deepeval.test_case import LLMTestCase
+        
         # Create test case
         test_case = LLMTestCase(
             input=question,

@@ -1,30 +1,56 @@
-# AI Agent Tester - 100% Custom Implementation
-# No external scenario library needed!
+# ============================================================================
+# AI Agent Quality Assurance Suite v3.0 - Requirements
+# ============================================================================
 
-# Core
-streamlit>=1.30.0
-aiohttp
-litellm
-python-dotenv
+# Core Framework
+streamlit>=1.30.0          # Web UI framework
+aiohttp>=3.9.0             # Async HTTP client
+litellm>=1.30.0            # Universal LLM API client
+python-dotenv>=1.0.0       # Environment variable management
+pandas>=2.0.0              # Data analysis and export
 
 # LLM Providers
-groq
-google-generativeai
+groq>=0.4.0                # Groq API client
+google-generativeai>=0.3.0 # Google Gemini API client
+openai>=1.0.0              # OpenAI/Azure OpenAI client (via litellm)
 
 # RAG Testing
-PyPDF2  # PDF text extraction
+PyPDF2>=3.0.0              # PDF text extraction for RAG ground truth
 
-# Quality Evaluation Frameworks
-ragas  # RAG evaluation metrics
-deepeval  # LLM evaluation framework
+# Quality Evaluation Frameworks (optional - LLM judge fallback available)
+# ragas>=0.1.0             # RAG evaluation metrics
+# deepeval>=0.20.0         # LLM evaluation framework
 
-# Real Testing Tools (optional but recommended)
-garak  # LLM vulnerability scanner for security testing
-locust  # Load testing framework  
-hypothesis  # Property-based testing for edge cases
+# Security Testing (optional - builtin probes available)
+# garak>=0.9.0             # LLM vulnerability scanner
 
-# Testing & Utilities
-flask
-pandas
-pytest
+# Property-based Testing (optional)
+hypothesis>=6.90.0         # Property-based testing for edge cases
 
+# Server & Testing Utilities
+flask>=3.0.0               # Demo chatbot server
+pytest>=7.4.0              # Testing framework
+requests>=2.31.0           # HTTP library
+
+# NOTE: Locust is NOT used (conflicts with Streamlit)
+# Load testing uses builtin async implementation instead
+
+# ============================================================================
+# Provider-Specific Notes:
+# ============================================================================
+# NVIDIA NIM (Default):
+#   - Set NVIDIA_NIM_API_KEY
+#   - 40 RPM free tier
+#
+# Azure OpenAI:
+#   - Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT
+#   - 60 RPM (paid)
+#
+# Groq:
+#   - Set GROQ_API_KEY
+#   - 30 RPM, 100K tokens/day free
+#
+# Google Gemini:
+#   - Set GEMINI_API_KEY
+#   - 60 RPM, 1M tokens/day free
+# ============================================================================

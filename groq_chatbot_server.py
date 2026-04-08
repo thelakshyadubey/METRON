@@ -25,8 +25,8 @@ limiter = Limiter(
 
 # Initialize NVIDIA client (OpenAI-compatible)
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"  # Fixed: was api.build.nvidia.com
-# Try both API keys - both work with integrate.api.nvidia.com
-api_key = os.getenv("NVIDIA_NIM_API_KEY") or os.getenv("NVIDIA_API_KEY_V2")
+# Use NVIDIA_API_KEY_V2 for chatbot server (separate from NVIDIA_NIM_API_KEY used by judge)
+api_key = os.getenv("NVIDIA_API_KEY_V2") or os.getenv("NVIDIA_NIM_API_KEY")
 nvidia_client = OpenAI(
     base_url=NVIDIA_BASE_URL,
     api_key=api_key

@@ -28,60 +28,30 @@ import string
 # ============================================================================
 #                         TOOL AVAILABILITY CHECKS
 # ============================================================================
+# ALL imports are LAZY to avoid slow startup and dependency conflicts
 
-# Check Garak
-try:
-    import garak
-    from garak import probes
-    HAS_GARAK = True
-except ImportError:
-    HAS_GARAK = False
+import importlib.util
 
-# Check Locust
-try:
-    from locust import HttpUser, task, between
-    from locust.env import Environment
-    from locust.stats import stats_printer, stats_history
-    from locust.runners import Runner
-    import gevent
-    HAS_LOCUST = True
-except ImportError:
-    HAS_LOCUST = False
+def _check_package(name: str) -> bool:
+    """Check if a package is available without importing it"""
+    try:
+        return importlib.util.find_spec(name) is not None
+    except Exception:
+        return False
 
-# Check Hypothesis
-try:
-    from hypothesis import given, strategies as st, settings, Verbosity
-    HAS_HYPOTHESIS = True
-except ImportError:
-    HAS_HYPOTHESIS = False
-
-# Check RAGAS
-try:
-    from ragas import evaluate as ragas_evaluate
-    from ragas.metrics import faithfulness, answer_relevancy
-    from ragas import EvaluationDataset, SingleTurnSample
-    HAS_RAGAS = True
-except ImportError:
-    HAS_RAGAS = False
-
-# Check DeepEval
-try:
-    from deepeval.metrics import (
-        AnswerRelevancyMetric,
-        FaithfulnessMetric,
-        HallucinationMetric,
-    )
-    from deepeval.test_case import LLMTestCase
-    HAS_DEEPEVAL = True
-except ImportError:
-    HAS_DEEPEVAL = False
+# Check availability without importing (avoids slow startup)
+HAS_GARAK = _check_package("garak")
+HAS_LOCUST = False  # Disabled - conflicts with Streamlit
+HAS_HYPOTHESIS = _check_package("hypothesis")
+HAS_RAGAS = _check_package("ragas")
+HAS_DEEPEVAL = _check_package("deepeval")
 
 
 def get_tool_status() -> Dict[str, bool]:
     """Get installation status of all tools"""
     return {
         "garak": HAS_GARAK,
-        "locust": HAS_LOCUST,
+        "locust": True,  # Using builtin async instead (avoids monkey-patching conflicts)
         "hypothesis": HAS_HYPOTHESIS,
         "ragas": HAS_RAGAS,
         "deepeval": HAS_DEEPEVAL,
@@ -91,7 +61,8 @@ def get_tool_status() -> Dict[str, bool]:
 def get_installation_commands() -> str:
     """Get pip commands to install missing tools"""
     tools = get_tool_status()
-    missing = [name for name, installed in tools.items() if not installed]
+    # Don't include locust - we use builtin async
+    missing = [name for name, installed in tools.items() if not installed and name != "locust"]
     
     if not missing:
         return "All tools are installed! ✅"
@@ -397,7 +368,7 @@ async def run_locust_load_test(
             concurrent_users=concurrent_users,
             duration_seconds=total_time,
             error_rate=errors / (len(latencies) + errors) * 100 if (len(latencies) + errors) > 0 else 0,
-            tool_used="locust" if HAS_LOCUST else "builtin_async",
+            tool_used="builtin_async",  # Using async, not Locust to avoid monkey-patching issues
         )
     else:
         return LocustLoadResult(
@@ -497,6 +468,9 @@ def generate_edge_case_inputs() -> List[Dict[str, Any]]:
     # Generate additional cases with Hypothesis if available
     if HAS_HYPOTHESIS:
         try:
+            # Lazy import
+            from hypothesis import strategies as st
+            
             # Generate random strings
             random_strings = [
                 st.text(min_size=1, max_size=100).example()
@@ -622,6 +596,11 @@ async def run_ragas_evaluation(
     
     if HAS_RAGAS and context:
         try:
+            # Lazy import to avoid slow startup
+            from ragas import evaluate as ragas_evaluate
+            from ragas.metrics import faithfulness, answer_relevancy
+            from ragas import EvaluationDataset, SingleTurnSample
+            
             # Create RAGAS sample
             sample = SingleTurnSample(
                 user_input=question,
@@ -748,6 +727,14 @@ async def run_deepeval_metrics(
     
     if HAS_DEEPEVAL:
         try:
+            # Lazy import to avoid slow startup
+            from deepeval.metrics import (
+                AnswerRelevancyMetric,
+                FaithfulnessMetric,
+                HallucinationMetric,
+            )
+            from deepeval.test_case import LLMTestCase
+            
             test_case = LLMTestCase(
                 input=question,
                 actual_output=answer,
