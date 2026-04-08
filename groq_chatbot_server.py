@@ -24,10 +24,12 @@ limiter = Limiter(
 )
 
 # Initialize NVIDIA client (OpenAI-compatible)
-NVIDIA_BASE_URL = "https://api.build.nvidia.com/v1"
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"  # Fixed: was api.build.nvidia.com
+# Try both API keys - both work with integrate.api.nvidia.com
+api_key = os.getenv("NVIDIA_NIM_API_KEY") or os.getenv("NVIDIA_API_KEY_V2")
 nvidia_client = OpenAI(
     base_url=NVIDIA_BASE_URL,
-    api_key=os.getenv("NVIDIA_API_KEY_V2")  # Changed to V2
+    api_key=api_key
 )
 
 # System prompt (same as before)
@@ -41,8 +43,11 @@ You assist users with:
 
 Be encouraging, professional, and concise. Adapt advice to the user's fitness level. Never promote harmful or extreme practices."""
 
-# Fixed model
-DEFAULT_MODEL = "meta/llama-3.1-70b-instruct"
+# Working models (all tested and confirmed):
+DEFAULT_MODEL = "meta/llama-3.1-8b-instruct"  # Fast, smaller model (recommended)
+# DEFAULT_MODEL = "meta/llama-3.1-70b-instruct"  # Larger, more capable
+# DEFAULT_MODEL = "meta/llama3-8b-instruct"  # Llama 3 (previous version)
+# DEFAULT_MODEL = "mistralai/mistral-7b-instruct-v0.3"  # Mistral alternative
 
 
 @app.route('/chat', methods=['POST'])
@@ -90,25 +95,33 @@ def health():
 
 if __name__ == '__main__':
     # Check if API key is set
-    if not os.getenv("NVIDIA_API_KEY_V2"):
+    api_key = os.getenv("NVIDIA_NIM_API_KEY") or os.getenv("NVIDIA_API_KEY_V2")
+    if not api_key:
         print("=" * 50)
-        print("⚠️  ERROR: NVIDIA_API_KEY_V2 not set!")
+        print("⚠️  ERROR: No NVIDIA API key found!")
         print("=" * 50)
         print()
-        print("Set it with:")
-        print("  set NVIDIA_API_KEY_V2=your_key_here   (Windows)")
-        print("  export NVIDIA_API_KEY_V2=your_key_here (Linux/Mac)")
+        print("Set one of these in .env file:")
+        print("  NVIDIA_NIM_API_KEY=your_key_here")
+        print("  NVIDIA_API_KEY_V2=your_key_here")
         print()
         print("Get your free key from: https://build.nvidia.com")
         print("=" * 50)
         exit(1)
 
-    print("=" * 50)
+    key_type = "NVIDIA_NIM_API_KEY" if os.getenv("NVIDIA_NIM_API_KEY") else "NVIDIA_API_KEY_V2"
+    
+    print("=" * 60)
     print("🤖 NVIDIA Chatbot API Server (Rate Limited: 39 RPM)")
-    print("=" * 50)
+    print("=" * 60)
+    print()
+    print(f"✓ Using: {key_type}")
+    print(f"✓ API Key: {api_key[:10]}...{api_key[-4:]}")
+    print(f"✓ Endpoint: {NVIDIA_BASE_URL}")
+    print(f"✓ Model: {DEFAULT_MODEL}")
     print()
     print("Endpoints:")
-    print("  POST http://localhost:5000/chat (max 39 calls per minute per IP)")
+    print("  POST http://localhost:5000/chat (max 39 calls/min per IP)")
     print("  GET  http://localhost:5000/health")
     print()
     print("Example request:")
@@ -116,9 +129,8 @@ if __name__ == '__main__':
     print('       -H "Content-Type: application/json" \\')
     print('       -d \'{"message": "Hello!"}\'')
     print()
-    print(f"Using model: {DEFAULT_MODEL}")
     print("Press Ctrl+C to stop")
-    print("=" * 50)
+    print("=" * 60)
     print()
 
     app.run(host='0.0.0.0', port=5000, debug=False)

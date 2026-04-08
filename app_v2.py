@@ -3,14 +3,15 @@
 ====================================
 
 Professional testing framework for AI chatbots and agents.
-Clean architecture with 4 testing phases:
+Clean architecture with 5 testing phases:
 1. Functional Testing - Conversation quality & accuracy
 2. Security Testing - Adversarial attacks & compliance
-3. Performance Testing - Latency, throughput, metrics
-4. Load Testing - Concurrent users & stress testing
+3. Quality Testing - RAGAS & DeepEval metrics (NEW!)
+4. Performance Testing - Latency, throughput, metrics
+5. Load Testing - Concurrent users & stress testing
 
 Author: AI QA Framework
-Version: 2.0.0
+Version: 2.1.0
 """
 
 import streamlit as st
@@ -51,6 +52,18 @@ try:
 except ImportError:
     HAS_FUNCTIONAL_TESTS = False
 
+# Import quality metrics (RAGAS & DeepEval)
+try:
+    from quality_metrics import (
+        QualityMetricCategory, MetricSeverity, MetricResult,
+        QualityTestResult, QualityTestConfig,
+        run_quality_evaluation, generate_quality_report,
+        get_default_quality_test_cases, get_available_frameworks,
+    )
+    HAS_QUALITY_METRICS = True
+except ImportError:
+    HAS_QUALITY_METRICS = False
+
 
 # ============================================================================
 #                              CONFIGURATION
@@ -60,7 +73,7 @@ except ImportError:
 class AppConfig:
     """Central configuration - no hardcoded values scattered in code"""
     app_name: str = "AI Agent QA Suite"
-    version: str = "2.0.0"
+    version: str = "2.1.0"
     
     # Directories
     data_dir: Path = field(default_factory=lambda: Path(__file__).parent / "data")
@@ -1974,12 +1987,13 @@ def main():
     chatbot = ChatbotAdapter(chatbot_config)
     
     # Main tabs
-    tab_functional, tab_security, tab_performance, tab_load, tab_results = st.tabs([
-        "🧪 Functional Testing",
-        "🛡️ Security Testing",
-        "⚡ Performance Testing",
-        "📈 Load Testing",
-        "📊 Results & Export",
+    tab_functional, tab_security, tab_quality, tab_performance, tab_load, tab_results = st.tabs([
+        "🧪 Functional",
+        "🛡️ Security",
+        "📐 Quality (RAGAS)",
+        "⚡ Performance",
+        "📈 Load",
+        "📊 Results",
     ])
     
     # ========== TAB 1: FUNCTIONAL TESTING ==========
@@ -2548,7 +2562,432 @@ def main():
             else:
                 st.error(f"**Security Score:** {passed}/{len(results)} tests passed ({pass_rate:.0f}%) 🚨")
     
-    # ========== TAB 3: PERFORMANCE TESTING ==========
+    # ========== TAB 3: QUALITY TESTING (RAGAS & DeepEval) ==========
+    with tab_quality:
+        st.header("📐 Quality Testing (RAGAS & DeepEval)")
+        st.caption("Evaluate response quality using industry-standard LLM evaluation metrics")
+        
+        # Check if quality metrics module is available
+        if not HAS_QUALITY_METRICS:
+            st.error("⚠️ Quality metrics module not found. Please ensure quality_metrics.py exists.")
+            st.stop()
+        
+        # Show framework status
+        frameworks = get_available_frameworks()
+        status_cols = st.columns(3)
+        with status_cols[0]:
+            if frameworks.get("ragas", False):
+                st.success("✅ RAGAS Installed")
+            else:
+                st.warning("⚠️ RAGAS not installed\n`pip install ragas`")
+        with status_cols[1]:
+            if frameworks.get("deepeval", False):
+                st.success("✅ DeepEval Installed")
+            else:
+                st.warning("⚠️ DeepEval not installed\n`pip install deepeval`")
+        with status_cols[2]:
+            st.info("ℹ️ LLM-as-Judge fallback always available")
+        
+        st.divider()
+        
+        # Two main modes
+        quality_mode = st.radio(
+            "Testing Mode",
+            ["🎯 Single Response Evaluation", "📊 Batch Test Suite", "📚 RAG Evaluation"],
+            horizontal=True,
+        )
+        
+        st.divider()
+        
+        if quality_mode == "🎯 Single Response Evaluation":
+            # Single response evaluation
+            st.subheader("Evaluate a Single Response")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                eval_question = st.text_area(
+                    "Question / User Input",
+                    placeholder="Enter the question that was asked...",
+                    height=100,
+                )
+                
+                eval_response = st.text_area(
+                    "AI Response to Evaluate",
+                    placeholder="Enter the AI's response to evaluate...",
+                    height=150,
+                )
+            
+            with col2:
+                eval_context = st.text_area(
+                    "Context (Optional - for RAG evaluation)",
+                    placeholder="Enter any context/retrieved documents that were used...",
+                    height=100,
+                )
+                
+                eval_expected = st.text_area(
+                    "Expected Answer (Optional - for correctness check)",
+                    placeholder="Enter the expected/ideal answer...",
+                    height=100,
+                )
+            
+            # Metric selection
+            st.subheader("📊 Select Metrics")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**RAGAS Metrics**")
+                run_faithfulness = st.checkbox("Faithfulness", value=True, help="Is the response grounded in the context?")
+                run_relevancy = st.checkbox("Answer Relevancy", value=True, help="Does the response address the question?")
+                run_ctx_precision = st.checkbox("Context Precision", value=bool(eval_context), help="Is the context relevant?")
+                run_ctx_recall = st.checkbox("Context Recall", value=bool(eval_context and eval_expected), help="Does context have needed info?")
+                run_correctness = st.checkbox("Answer Correctness", value=bool(eval_expected), help="Does response match expected?")
+            
+            with col2:
+                st.markdown("**DeepEval Metrics**")
+                run_hallucination = st.checkbox("Hallucination Detection", value=True, help="Does it make things up?")
+                run_toxicity = st.checkbox("Toxicity Detection", value=True, help="Is the content harmful?")
+                run_bias = st.checkbox("Bias Detection", value=True, help="Is there unfair bias?")
+                run_coherence = st.checkbox("Coherence", value=True, help="Is it logically structured?")
+                run_fluency = st.checkbox("Fluency", value=True, help="Is it grammatically correct?")
+                run_geval = st.checkbox("G-Eval (Custom Criteria)", value=False, help="Evaluate with custom criteria")
+            
+            # Custom G-Eval criteria
+            if run_geval:
+                geval_criteria = st.text_area(
+                    "Custom G-Eval Criteria",
+                    value="""Evaluate the response based on:
+1. Helpfulness - Does it actually help the user?
+2. Accuracy - Is the information correct?
+3. Completeness - Does it fully address the question?
+4. Clarity - Is it easy to understand?
+5. Conciseness - Is it appropriately brief?""",
+                    height=150,
+                )
+            else:
+                geval_criteria = ""
+            
+            # Run evaluation
+            if st.button("🔍 Evaluate Response", type="primary", use_container_width=True):
+                if not eval_question or not eval_response:
+                    st.error("Please enter both a question and a response to evaluate.")
+                else:
+                    # Build config
+                    config = QualityTestConfig(
+                        run_faithfulness=run_faithfulness and bool(eval_context),
+                        run_answer_relevancy=run_relevancy,
+                        run_context_precision=run_ctx_precision and bool(eval_context),
+                        run_context_recall=run_ctx_recall and bool(eval_context) and bool(eval_expected),
+                        run_answer_correctness=run_correctness and bool(eval_expected),
+                        run_hallucination=run_hallucination,
+                        run_toxicity=run_toxicity,
+                        run_bias=run_bias,
+                        run_coherence=run_coherence,
+                        run_fluency=run_fluency,
+                        run_geval=run_geval,
+                        geval_criteria=geval_criteria,
+                    )
+                    
+                    with st.spinner("🔍 Evaluating response quality..."):
+                        loop = asyncio.new_event_loop()
+                        result = loop.run_until_complete(run_quality_evaluation(
+                            question=eval_question,
+                            response=eval_response,
+                            context=eval_context,
+                            expected_answer=eval_expected,
+                            config=config,
+                            model=selected_model,
+                            api_key=api_key,
+                        ))
+                        loop.close()
+                    
+                    # Store results
+                    if "quality_results" not in st.session_state:
+                        st.session_state.quality_results = []
+                    st.session_state.quality_results.append(result)
+                    
+                    # Display results
+                    st.subheader("📊 Evaluation Results")
+                    
+                    # Overall score
+                    overall_icon = "✅" if result.overall_passed else "❌"
+                    st.metric(
+                        f"{overall_icon} Overall Quality Score",
+                        f"{result.overall_score:.0%}",
+                        delta=f"{result.latency_ms:.0f}ms evaluation time",
+                    )
+                    
+                    # Metric breakdown
+                    st.markdown("### Metric Breakdown")
+                    
+                    # Group by category
+                    ragas_metrics = [m for m in result.metrics if m.category == "ragas"]
+                    deepeval_metrics = [m for m in result.metrics if m.category == "deepeval"]
+                    
+                    if ragas_metrics:
+                        st.markdown("#### 📊 RAGAS Metrics")
+                        cols = st.columns(min(len(ragas_metrics), 3))
+                        for i, metric in enumerate(ragas_metrics):
+                            with cols[i % 3]:
+                                icon = "✅" if metric.passed else "❌"
+                                st.metric(
+                                    f"{icon} {metric.metric_name}",
+                                    f"{metric.score:.0%}",
+                                    delta=f"threshold: {metric.threshold:.0%}",
+                                )
+                    
+                    if deepeval_metrics:
+                        st.markdown("#### 🔬 DeepEval Metrics")
+                        cols = st.columns(min(len(deepeval_metrics), 3))
+                        for i, metric in enumerate(deepeval_metrics):
+                            with cols[i % 3]:
+                                icon = "✅" if metric.passed else "❌"
+                                st.metric(
+                                    f"{icon} {metric.metric_name}",
+                                    f"{metric.score:.0%}",
+                                    delta=f"threshold: {metric.threshold:.0%}",
+                                )
+                    
+                    # Detailed reasoning
+                    st.markdown("### 📝 Detailed Analysis")
+                    for metric in result.metrics:
+                        icon = "✅" if metric.passed else "❌"
+                        with st.expander(f"{icon} {metric.metric_name}: {metric.score:.0%}"):
+                            st.markdown(f"**Reasoning:** {metric.reasoning}")
+                            if metric.details:
+                                st.json(metric.details)
+        
+        elif quality_mode == "📊 Batch Test Suite":
+            # Batch testing with multiple Q&A pairs
+            st.subheader("Batch Quality Evaluation")
+            
+            # Test case input
+            st.markdown("Add test cases (question, response, optional context/expected answer)")
+            
+            # Session state for test cases
+            if "quality_test_cases" not in st.session_state:
+                st.session_state.quality_test_cases = []
+            
+            # Add test case form
+            with st.expander("➕ Add Test Case", expanded=len(st.session_state.quality_test_cases) == 0):
+                tc_question = st.text_input("Question", key="tc_question")
+                tc_response = st.text_area("Response", key="tc_response", height=100)
+                tc_context = st.text_area("Context (optional)", key="tc_context", height=80)
+                tc_expected = st.text_input("Expected Answer (optional)", key="tc_expected")
+                
+                if st.button("Add Test Case"):
+                    if tc_question and tc_response:
+                        st.session_state.quality_test_cases.append({
+                            "question": tc_question,
+                            "response": tc_response,
+                            "context": tc_context,
+                            "expected_answer": tc_expected,
+                        })
+                        st.rerun()
+                    else:
+                        st.error("Question and Response are required")
+            
+            # Show existing test cases
+            if st.session_state.quality_test_cases:
+                st.markdown(f"**{len(st.session_state.quality_test_cases)} Test Cases**")
+                
+                for i, tc in enumerate(st.session_state.quality_test_cases):
+                    col1, col2 = st.columns([5, 1])
+                    with col1:
+                        st.markdown(f"**{i+1}.** {tc['question'][:60]}...")
+                    with col2:
+                        if st.button("🗑️", key=f"del_tc_{i}"):
+                            st.session_state.quality_test_cases.pop(i)
+                            st.rerun()
+                
+                # Clear all button
+                if st.button("Clear All Test Cases"):
+                    st.session_state.quality_test_cases = []
+                    st.rerun()
+                
+                # Run batch evaluation
+                st.divider()
+                
+                # Metric selection for batch
+                st.markdown("**Metrics to Run**")
+                col1, col2 = st.columns(2)
+                with col1:
+                    batch_ragas = st.checkbox("Run RAGAS Metrics", value=True)
+                with col2:
+                    batch_deepeval = st.checkbox("Run DeepEval Metrics", value=True)
+                
+                if st.button("🚀 Run Batch Evaluation", type="primary", use_container_width=True):
+                    config = QualityTestConfig(
+                        run_faithfulness=batch_ragas,
+                        run_answer_relevancy=batch_ragas,
+                        run_context_precision=batch_ragas,
+                        run_context_recall=batch_ragas,
+                        run_answer_correctness=batch_ragas,
+                        run_hallucination=batch_deepeval,
+                        run_toxicity=batch_deepeval,
+                        run_bias=batch_deepeval,
+                        run_coherence=batch_deepeval,
+                        run_fluency=batch_deepeval,
+                        run_geval=False,
+                    )
+                    
+                    progress = st.progress(0)
+                    status = st.empty()
+                    results = []
+                    
+                    loop = asyncio.new_event_loop()
+                    
+                    for i, tc in enumerate(st.session_state.quality_test_cases):
+                        status.text(f"Evaluating {i+1}/{len(st.session_state.quality_test_cases)}...")
+                        progress.progress((i + 1) / len(st.session_state.quality_test_cases))
+                        
+                        result = loop.run_until_complete(run_quality_evaluation(
+                            question=tc["question"],
+                            response=tc["response"],
+                            context=tc.get("context", ""),
+                            expected_answer=tc.get("expected_answer", ""),
+                            config=config,
+                            model=selected_model,
+                            api_key=api_key,
+                        ))
+                        results.append(result)
+                    
+                    loop.close()
+                    
+                    status.text("✅ Batch evaluation complete!")
+                    
+                    # Store results
+                    st.session_state.quality_batch_results = results
+                    
+                    # Generate report
+                    report = generate_quality_report(results)
+                    
+                    # Display summary
+                    st.subheader("📊 Batch Results Summary")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("Tests Run", report["total_tests"])
+                    col2.metric("Pass Rate", f"{report['overall_pass_rate']:.0f}%")
+                    col3.metric("Avg Score", f"{report['average_overall_score']:.0%}")
+                    col4.metric("Avg Latency", f"{report['average_latency_ms']:.0f}ms")
+                    
+                    if report.get("ragas_average"):
+                        st.metric("RAGAS Average", f"{report['ragas_average']:.0%}")
+                    if report.get("deepeval_average"):
+                        st.metric("DeepEval Average", f"{report['deepeval_average']:.0%}")
+                    
+                    # Per-metric breakdown
+                    if report.get("metric_summaries"):
+                        st.markdown("### Per-Metric Summary")
+                        for name, data in report["metric_summaries"].items():
+                            st.markdown(f"- **{name}**: {data['average_score']:.0%} avg, {data['pass_rate']:.0f}% pass rate")
+            else:
+                st.info("Add test cases to run batch evaluation")
+                
+                # Load default test cases
+                if st.button("📥 Load Sample Test Cases"):
+                    st.session_state.quality_test_cases = get_default_quality_test_cases()
+                    st.rerun()
+        
+        elif quality_mode == "📚 RAG Evaluation":
+            # RAG-specific evaluation
+            st.subheader("RAG System Evaluation")
+            st.markdown("""
+            Test your RAG (Retrieval-Augmented Generation) system's quality:
+            - **Faithfulness**: Are responses grounded in retrieved context?
+            - **Hallucination**: Does it make up information not in documents?
+            - **Context Quality**: Is retrieved context relevant and complete?
+            """)
+            
+            # Check if agent has RAG enabled
+            if "agent_seed_data" in st.session_state and st.session_state.agent_seed_data.is_rag:
+                st.success("✅ RAG mode enabled with ground truth documents")
+                ground_truth = st.session_state.agent_seed_data.ground_truth_docs
+            else:
+                st.warning("⚠️ Enable RAG mode in sidebar and upload ground truth documents for full RAG evaluation")
+                ground_truth = []
+            
+            # RAG test configuration
+            rag_test_question = st.text_area(
+                "Question to Test",
+                placeholder="Enter a question to test against the RAG system...",
+                height=80,
+            )
+            
+            # Test against live endpoint
+            if st.button("🧪 Test RAG Quality", type="primary", disabled=not rag_test_question):
+                with st.spinner("Testing RAG system..."):
+                    # Get response from chatbot
+                    loop = asyncio.new_event_loop()
+                    
+                    start_time = time.time()
+                    response, latency = loop.run_until_complete(
+                        chatbot.send_message(rag_test_question)
+                    )
+                    
+                    # Run RAG-specific evaluation
+                    context = "\n\n".join(ground_truth) if ground_truth else ""
+                    
+                    config = QualityTestConfig(
+                        run_faithfulness=bool(context),
+                        run_answer_relevancy=True,
+                        run_context_precision=bool(context),
+                        run_context_recall=False,  # Need expected answer
+                        run_answer_correctness=False,  # Need expected answer
+                        run_hallucination=True,
+                        run_toxicity=False,
+                        run_bias=False,
+                        run_coherence=True,
+                        run_fluency=True,
+                        run_geval=False,
+                    )
+                    
+                    result = loop.run_until_complete(run_quality_evaluation(
+                        question=rag_test_question,
+                        response=response,
+                        context=context,
+                        expected_answer="",
+                        config=config,
+                        model=selected_model,
+                        api_key=api_key,
+                    ))
+                    loop.close()
+                    
+                    # Display results
+                    st.markdown("### RAG Response")
+                    st.info(f"**Question:** {rag_test_question}")
+                    st.success(f"**Response:** {response}")
+                    st.caption(f"Latency: {latency:.0f}ms")
+                    
+                    # Quality metrics
+                    st.markdown("### RAG Quality Metrics")
+                    
+                    cols = st.columns(3)
+                    for i, metric in enumerate(result.metrics):
+                        with cols[i % 3]:
+                            icon = "✅" if metric.passed else "❌"
+                            color = "green" if metric.passed else "red"
+                            st.metric(
+                                f"{icon} {metric.metric_name}",
+                                f"{metric.score:.0%}",
+                            )
+                    
+                    # Hallucination details
+                    hallucination_metric = next((m for m in result.metrics if m.metric_name == "Hallucination"), None)
+                    if hallucination_metric:
+                        with st.expander("🔍 Hallucination Analysis"):
+                            st.markdown(f"**Reasoning:** {hallucination_metric.reasoning}")
+                            if hallucination_metric.details.get("hallucinated_claims"):
+                                st.error("**Hallucinated Claims:**")
+                                for claim in hallucination_metric.details["hallucinated_claims"]:
+                                    st.markdown(f"- {claim}")
+                            if hallucination_metric.details.get("verified_claims"):
+                                st.success("**Verified Claims:**")
+                                for claim in hallucination_metric.details["verified_claims"]:
+                                    st.markdown(f"- {claim}")
+    
+    # ========== TAB 4: PERFORMANCE TESTING ==========
     with tab_performance:
         st.header("⚡ Performance Testing")
         st.caption("Measure response times, latency percentiles, and throughput")
@@ -2617,7 +3056,7 @@ def main():
                 df = pd.DataFrame({"Request": range(1, len(metrics.latencies) + 1), "Latency (ms)": metrics.latencies})
                 st.line_chart(df.set_index("Request"))
     
-    # ========== TAB 4: LOAD TESTING ==========
+    # ========== TAB 5: LOAD TESTING ==========
     with tab_load:
         st.header("📈 Load Testing")
         st.caption("Test performance under concurrent users and stress conditions")
@@ -2685,7 +3124,7 @@ def main():
             else:
                 st.error("❌ Poor - High error rate under load, needs optimization")
     
-    # ========== TAB 5: RESULTS & EXPORT ==========
+    # ========== TAB 6: RESULTS & EXPORT ==========
     with tab_results:
         st.header("📊 Results & Export")
         
@@ -2693,6 +3132,7 @@ def main():
         has_results = (
             "functional_results" in st.session_state or
             "security_results" in st.session_state or
+            "quality_results" in st.session_state or
             "performance_metrics" in st.session_state or
             "load_metrics" in st.session_state
         )
@@ -2704,7 +3144,7 @@ def main():
         # Summary cards
         st.subheader("📈 Test Summary")
         
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             if "functional_results" in st.session_state:
@@ -2723,13 +3163,21 @@ def main():
                 st.metric("🛡️ Security", "Not run")
         
         with col3:
+            if "quality_results" in st.session_state:
+                results = st.session_state.quality_results
+                avg_score = sum(r.overall_score for r in results) / len(results) if results else 0
+                st.metric("📐 Quality", f"{avg_score:.0%}")
+            else:
+                st.metric("📐 Quality", "Not run")
+        
+        with col4:
             if "performance_metrics" in st.session_state:
                 metrics = st.session_state.performance_metrics
                 st.metric("⚡ Performance", f"{metrics.avg_latency_ms:.0f}ms avg")
             else:
                 st.metric("⚡ Performance", "Not run")
         
-        with col4:
+        with col5:
             if "load_metrics" in st.session_state:
                 metrics = st.session_state.load_metrics
                 st.metric("📈 Load", f"{metrics.error_rate:.1f}% errors")
@@ -2744,6 +3192,7 @@ def main():
         result_type = st.selectbox("View Results", [
             "Functional Tests",
             "Security Tests",
+            "Quality Tests (RAGAS/DeepEval)",
             "Performance Metrics",
             "Load Test Metrics",
         ])
@@ -2786,6 +3235,25 @@ def main():
                         role = "👤 Attacker" if msg["role"] == "user" else "🤖 Bot"
                         st.markdown(f"**{role}:** {msg['content']}")
         
+        elif result_type == "Quality Tests (RAGAS/DeepEval)" and "quality_results" in st.session_state:
+            for result in st.session_state.quality_results:
+                icon = "✅" if result.overall_passed else "❌"
+                
+                with st.expander(f"{icon} Q: {result.question[:50]}... | Score: {result.overall_score:.0%}"):
+                    st.markdown(f"**Question:** {result.question}")
+                    st.markdown(f"**Response:** {result.response}")
+                    if result.context:
+                        st.markdown(f"**Context:** {result.context[:200]}...")
+                    if result.expected_answer:
+                        st.markdown(f"**Expected:** {result.expected_answer}")
+                    
+                    st.markdown("---")
+                    st.markdown("**Metrics:**")
+                    
+                    for metric in result.metrics:
+                        m_icon = "✅" if metric.passed else "❌"
+                        st.markdown(f"- {m_icon} **{metric.metric_name}**: {metric.score:.0%} - {metric.reasoning[:100]}...")
+        
         elif result_type == "Performance Metrics" and "performance_metrics" in st.session_state:
             metrics = st.session_state.performance_metrics
             st.json(asdict(metrics))
@@ -2808,6 +3276,8 @@ def main():
                     export_data["functional"] = [asdict(r) for r in st.session_state.functional_results]
                 if "security_results" in st.session_state:
                     export_data["security"] = [asdict(r) for r in st.session_state.security_results]
+                if "quality_results" in st.session_state:
+                    export_data["quality"] = [asdict(r) for r in st.session_state.quality_results]
                 if "performance_metrics" in st.session_state:
                     export_data["performance"] = asdict(st.session_state.performance_metrics)
                 if "load_metrics" in st.session_state:
@@ -2836,6 +3306,11 @@ Generated: {datetime.now().isoformat()}
                     results = st.session_state.security_results
                     passed = sum(1 for r in results if r.passed)
                     report += f"- Security: {passed}/{len(results)} passed\n"
+                
+                if "quality_results" in st.session_state:
+                    results = st.session_state.quality_results
+                    avg_score = sum(r.overall_score for r in results) / len(results) if results else 0
+                    report += f"- Quality (RAGAS/DeepEval): {avg_score:.0%} average score\n"
                 
                 if "performance_metrics" in st.session_state:
                     metrics = st.session_state.performance_metrics

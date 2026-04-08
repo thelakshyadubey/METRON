@@ -14,6 +14,15 @@ google-generativeai
 # RAG Testing
 PyPDF2  # PDF text extraction
 
+# Quality Evaluation Frameworks
+ragas  # RAG evaluation metrics
+deepeval  # LLM evaluation framework
+
+# Real Testing Tools (optional but recommended)
+garak  # LLM vulnerability scanner for security testing
+locust  # Load testing framework  
+hypothesis  # Property-based testing for edge cases
+
 # Testing & Utilities
 flask
 pandas
